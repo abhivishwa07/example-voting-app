@@ -1,10 +1,15 @@
-FROM microsoft/dotnet:2.0.0-sdk
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:7.0 AS build
+ARG TARGETARCH
+WORKDIR /source
 
-WORKDIR /code
+COPY src/Worker/*.csproj .
+RUN dotnet restore -a "$TARGETARCH"
 
-ADD src/Worker /code/src/Worker
+COPY src/Worker/ .
+RUN dotnet publish -c release -o /app -a "$TARGETARCH" --no-restore
 
-RUN dotnet restore -v minimal src/Worker \
-    && dotnet publish -c Release -o "./" "src/Worker/" 
-
-CMD dotnet src/Worker/Worker.dll
+# runtime image
+FROM mcr.microsoft.com/dotnet/runtime:7.0
+WORKDIR /app
+COPY --from=build /app .
+ENTRYPOINT ["dotnet", "Worker.dll"]
